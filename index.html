@@ -1,0 +1,429 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>吉他指板音階學習助手</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        .fretboard-container {
+            position: relative;
+            /* 指板漸層：從 1 弦 (#a38867) 往 6 弦 (#6e5956) 漸變 */
+            background: linear-gradient(to bottom, #a38867, #6e5956);
+            border: 4px solid #5a4947;
+            border-radius: 4px;
+        }
+        .fretboard {
+            display: grid;
+            grid-template-rows: repeat(6, 1fr);
+            position: relative;
+            z-index: 2;
+        }
+        .string {
+            height: 40px;
+            display: flex;
+            align-items: center;
+            /* 調整琴弦下的陰影/線條顏色，使其在漸層背景上自然 */
+            border-bottom: 1px solid rgba(0, 0, 0, 0.15);
+            position: relative;
+        }
+        .string:last-child {
+            border-bottom: none;
+        }
+        .string::after {
+            content: '';
+            position: absolute;
+            left: 0;
+            right: 0;
+            background: #635b52; /* 指定的琴弦顏色 */
+            z-index: 5;
+            box-shadow: 0 1px 1px rgba(0,0,0,0.15);
+        }
+        
+        /* 真實吉他弦徑比例優化 */
+        .string-0::after { height: 1px; }   /* E弦 (1st) */
+        .string-1::after { height: 1.2px; } /* B弦 (2nd) */
+        .string-2::after { height: 1.6px; } /* G弦 (3rd) */
+        .string-3::after { height: 2.2px; } /* D弦 (4th) */
+        .string-4::after { height: 2.8px; } /* A弦 (5th) */
+        .string-5::after { height: 3.5px; } /* E弦 (6th) */
+
+        .fret {
+            min-width: 60px;
+            flex: 1;
+            height: 100%;
+            border-right: 2px solid rgba(201, 183, 161, 0.4); 
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            position: relative;
+            z-index: 10;
+            cursor: pointer;
+        }
+        
+        .fret-0 {
+            background: #f1f2f4; 
+            border-right: 6px solid #4a433c; 
+            min-width: 50px;
+        }
+        .fret-0:hover { background: #e2e4e8; }
+
+        .note-circle {
+            width: 28px;
+            height: 28px;
+            border-radius: 50%;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            font-size: 12px;
+            font-weight: bold;
+            color: white;
+            transition: all 0.2s;
+            opacity: 0;
+            transform: scale(0.5);
+            pointer-events: none;
+            z-index: 20;
+            text-shadow: 1px 1px 1px rgba(0,0,0,0.2);
+        }
+        .note-circle.visible {
+            opacity: 1;
+            transform: scale(1);
+        }
+
+        /* 鑲嵌記號 (Inlays) */
+        .inlay-layer {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            pointer-events: none;
+            z-index: 1;
+        }
+        .inlay-dot {
+            position: absolute;
+            width: 14px;
+            height: 14px;
+            background: #ffffff;
+            border-radius: 50%;
+            opacity: 0.4;
+            box-shadow: inset 1px 1px 2px rgba(0,0,0,0.2);
+            top: 50%;
+            transform: translate(-50%, -50%);
+        }
+
+        .fret-marker {
+            position: absolute;
+            bottom: -30px;
+            font-size: 12px;
+            color: #5d544b;
+            font-weight: bold;
+        }
+    </style>
+</head>
+<body class="bg-gray-50 min-h-screen font-sans">
+    <div class="max-w-6xl mx-auto px-4 py-8">
+        <header class="text-center mb-8">
+            <h1 class="text-3xl font-bold text-gray-800">吉他指板音階記憶學習網</h1>
+            <p class="text-gray-600 mt-2">根音顏色：#e68c8c | 指板漸層：#a38867 ↔ #6e5956</p>
+        </header>
+
+        <!-- 控制面板 -->
+        <div class="bg-white rounded-xl shadow-md p-6 mb-8 grid grid-cols-1 md:grid-cols-3 gap-6">
+            <div>
+                <label class="block text-sm font-medium text-gray-700 mb-2">選擇根音 (Root)</label>
+                <select id="root-select" class="w-full border-gray-300 rounded-md shadow-sm p-2 bg-gray-50 border">
+                    <option value="C">C</option>
+                    <option value="C#">C# / Db</option>
+                    <option value="D">D</option>
+                    <option value="D#">D# / Eb</option>
+                    <option value="E">E</option>
+                    <option value="F">F</option>
+                    <option value="F#">F# / Gb</option>
+                    <option value="G">G</option>
+                    <option value="G#">G# / Ab</option>
+                    <option value="A">A</option>
+                    <option value="A#">A# / Bb</option>
+                    <option value="B">B</option>
+                </select>
+            </div>
+            <div>
+                <label class="block text-sm font-medium text-gray-700 mb-2">選擇音階類型</label>
+                <select id="scale-select" class="w-full border-gray-300 rounded-md shadow-sm p-2 bg-gray-50 border">
+                    <option value="major">大調 (Major)</option>
+                    <option value="minor">自然小調 (Natural Minor)</option>
+                    <option value="pentaMajor">大調五聲 (Major Pentatonic)</option>
+                    <option value="pentaMinor">小調五聲 (Minor Pentatonic)</option>
+                </select>
+            </div>
+            <div class="flex flex-col justify-end">
+                <div class="flex space-x-2">
+                    <button id="toggle-quiz" class="flex-1 bg-blue-600 text-white py-2 px-4 rounded-md hover:bg-blue-700 transition font-bold">
+                        進入測驗模式
+                    </button>
+                    <button id="reset-board" class="bg-gray-200 text-gray-700 py-2 px-4 rounded-md hover:bg-gray-300 transition">
+                        重設
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <!-- 狀態顯示 -->
+        <div id="status-bar" class="hidden mb-4 p-4 bg-yellow-100 border-l-4 border-yellow-500 text-yellow-700">
+            <div class="flex justify-between items-center">
+                <span id="quiz-instruction" class="font-bold text-lg"></span>
+                <span id="quiz-feedback" class="font-medium italic"></span>
+            </div>
+        </div>
+
+        <!-- 指板區域 -->
+        <div class="bg-white p-12 rounded-xl shadow-lg overflow-x-auto mb-6">
+            <div class="fretboard-container" id="fretboard-container">
+                <div class="inlay-layer" id="inlay-layer">
+                    <!-- 鑲嵌點由 JS 注入 -->
+                </div>
+                <div class="fretboard" id="fretboard">
+                    <!-- 琴弦與品位由 JS 注入 -->
+                </div>
+            </div>
+        </div>
+
+        <!-- 說明 -->
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-8 text-gray-600">
+            <div class="bg-white p-6 rounded-lg shadow border-t-4 border-gray-400">
+                <h3 class="font-bold text-gray-800 mb-2 flex items-center">
+                    <span class="mr-2">🎸</span> 視覺優化
+                </h3>
+                <p class="text-sm">指板採用垂直漸層模擬木頭質感。根音以淡紅色 (#e68c8c) 標記，其他音階組成音為青綠色。</p>
+            </div>
+            <div class="bg-white p-6 rounded-lg shadow border-t-4 border-blue-500">
+                <h3 class="font-bold text-gray-800 mb-2 flex items-center">
+                    <span class="mr-2">🎯</span> 練習重點
+                </h3>
+                <p class="text-sm">觀察 12 品與空弦（0 品）的音名分佈完全相同，這是指板記憶的最基本週期規律。</p>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let audioContext = null;
+        function getAudioContext() {
+            if (!audioContext) {
+                audioContext = new (window.AudioContext || window.webkitAudioContext)();
+            }
+            if (audioContext.state === 'suspended') audioContext.resume();
+            return audioContext;
+        }
+
+        const NOTES = ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B'];
+        const STRINGS = ['E4', 'B3', 'G3', 'D3', 'A2', 'E2'];
+        const SCALES = {
+            major: [0, 2, 4, 5, 7, 9, 11],
+            minor: [0, 2, 3, 5, 7, 8, 10],
+            pentaMajor: [0, 2, 4, 7, 9],
+            pentaMinor: [0, 3, 5, 7, 10]
+        };
+
+        function getFrequency(noteName, octave) {
+            const noteIndex = NOTES.indexOf(noteName);
+            const a4 = 440;
+            const distance = (noteIndex - 9) + (octave - 4) * 12;
+            return a4 * Math.pow(2, distance / 12);
+        }
+
+        function playNote(frequency) {
+            const ctx = getAudioContext();
+            const osc = ctx.createOscillator();
+            const gain = ctx.createGain();
+            osc.type = 'triangle';
+            osc.frequency.setValueAtTime(frequency, ctx.currentTime);
+            gain.gain.setValueAtTime(0.3, ctx.currentTime);
+            gain.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + 0.8);
+            osc.connect(gain);
+            gain.connect(ctx.destination);
+            osc.start();
+            osc.stop(ctx.currentTime + 0.8);
+        }
+
+        let isQuizMode = false;
+        let currentTargetNote = '';
+        let currentScaleNotes = [];
+
+        const fretboardEl = document.getElementById('fretboard');
+        const inlayLayerEl = document.getElementById('inlay-layer');
+        const rootSelect = document.getElementById('root-select');
+        const scaleSelect = document.getElementById('scale-select');
+        const toggleQuizBtn = document.getElementById('toggle-quiz');
+        const resetBtn = document.getElementById('reset-board');
+        const statusBar = document.getElementById('status-bar');
+        const quizInstruction = document.getElementById('quiz-instruction');
+        const quizFeedback = document.getElementById('quiz-feedback');
+
+        function initFretboard() {
+            fretboardEl.innerHTML = '';
+            inlayLayerEl.innerHTML = '';
+            
+            for (let i = 0; i < 6; i++) {
+                const stringDiv = document.createElement('div');
+                stringDiv.className = `string string-${i}`;
+                
+                for (let j = 0; j <= 12; j++) {
+                    const fretDiv = document.createElement('div');
+                    fretDiv.className = `fret fret-${j}`;
+                    fretDiv.dataset.string = i;
+                    fretDiv.dataset.fret = j;
+
+                    const noteName = getNoteName(i, j);
+                    const noteCircle = document.createElement('div');
+                    noteCircle.className = 'note-circle';
+                    noteCircle.textContent = noteName;
+                    noteCircle.id = `note-${i}-${j}`;
+                    fretDiv.appendChild(noteCircle);
+                    
+                    if (i === 5) {
+                        const marker = document.createElement('div');
+                        marker.className = 'fret-marker';
+                        marker.textContent = j === 0 ? 'Open' : j;
+                        fretDiv.appendChild(marker);
+                    }
+
+                    fretDiv.onclick = () => handleFretClick(i, j);
+                    stringDiv.appendChild(fretDiv);
+                }
+                fretboardEl.appendChild(stringDiv);
+            }
+
+            const boardContainer = document.getElementById('fretboard-container');
+            const inlays = [3, 5, 7, 9, 12];
+            
+            inlays.forEach(fretPos => {
+                const targetFret = document.querySelector(`.fret-${fretPos}`);
+                if (targetFret) {
+                    const leftPos = ((targetFret.offsetLeft + targetFret.offsetWidth / 2) / boardContainer.offsetWidth) * 100;
+
+                    if (fretPos === 12) {
+                        createDot(leftPos, '35%');
+                        createDot(leftPos, '65%');
+                    } else {
+                        createDot(leftPos, '50%');
+                    }
+                }
+            });
+
+            updateScaleDisplay();
+        }
+
+        function createDot(left, top) {
+            const dot = document.createElement('div');
+            dot.className = 'inlay-dot';
+            dot.style.left = `${left}%`;
+            dot.style.top = top;
+            inlayLayerEl.appendChild(dot);
+        }
+
+        function getNoteInfo(stringIndex, fretIndex) {
+            const openNoteStr = STRINGS[stringIndex];
+            const openNoteName = openNoteStr.slice(0, -1);
+            const openOctave = parseInt(openNoteStr.slice(-1));
+            const startIndex = NOTES.indexOf(openNoteName);
+            const totalHalfSteps = startIndex + fretIndex;
+            const noteName = NOTES[totalHalfSteps % 12];
+            const octave = openOctave + Math.floor(totalHalfSteps / 12);
+            return { noteName, octave, frequency: getFrequency(noteName, octave) };
+        }
+
+        function getNoteName(stringIndex, fretIndex) {
+            return getNoteInfo(stringIndex, fretIndex).noteName;
+        }
+
+        function getScaleNotes(root, type) {
+            const rootIndex = NOTES.indexOf(root);
+            const intervals = SCALES[type];
+            return intervals.map(interval => NOTES[(rootIndex + interval) % 12]);
+        }
+
+        function updateScaleDisplay() {
+            if (isQuizMode) return;
+            const root = rootSelect.value;
+            const type = scaleSelect.value;
+            currentScaleNotes = getScaleNotes(root, type);
+            for (let i = 0; i < 6; i++) {
+                for (let j = 0; j <= 12; j++) {
+                    const noteName = getNoteName(i, j);
+                    const circle = document.getElementById(`note-${i}-${j}`);
+                    if (currentScaleNotes.includes(noteName)) {
+                        circle.classList.add('visible');
+                        // 根音顏色改為 #e68c8c，非根音維持 #8ae3c8 (60%)
+                        circle.style.backgroundColor = (noteName === root) ? '#e68c8c' : 'rgba(138, 227, 200, 0.6)';
+                    } else {
+                        circle.classList.remove('visible');
+                    }
+                }
+            }
+        }
+
+        function handleFretClick(string, fret) {
+            const info = getNoteInfo(string, fret);
+            const circle = document.getElementById(`note-${string}-${fret}`);
+            if (isQuizMode) {
+                if (info.noteName === currentTargetNote) {
+                    playNote(info.frequency);
+                    circle.style.backgroundColor = '#10b981';
+                    circle.classList.add('visible');
+                    quizFeedback.textContent = "正確！";
+                    quizFeedback.className = "text-green-600 font-bold";
+                    setTimeout(() => nextQuizQuestion(), 800);
+                } else {
+                    circle.style.backgroundColor = '#f87171';
+                    circle.classList.add('visible');
+                    quizFeedback.textContent = "再試試看";
+                    quizFeedback.className = "text-red-500 italic";
+                    setTimeout(() => circle.classList.remove('visible'), 500);
+                }
+            } else {
+                playNote(info.frequency);
+                const wasVisible = circle.classList.contains('visible');
+                if (!wasVisible) {
+                    circle.classList.add('visible');
+                    circle.style.backgroundColor = 'rgba(255, 255, 255, 0.3)';
+                    setTimeout(() => circle.classList.remove('visible'), 300);
+                }
+            }
+        }
+
+        function nextQuizQuestion() {
+            document.querySelectorAll('.note-circle').forEach(c => c.classList.remove('visible'));
+            currentTargetNote = currentScaleNotes[Math.floor(Math.random() * currentScaleNotes.length)];
+            quizInstruction.textContent = `請找出： ${currentTargetNote}`;
+            quizFeedback.textContent = "";
+        }
+
+        toggleQuizBtn.onclick = () => {
+            getAudioContext();
+            isQuizMode = !isQuizMode;
+            if (isQuizMode) {
+                toggleQuizBtn.textContent = '結束測驗';
+                toggleQuizBtn.classList.replace('bg-blue-600', 'bg-red-600');
+                statusBar.classList.remove('hidden');
+                currentScaleNotes = getScaleNotes(rootSelect.value, scaleSelect.value);
+                nextQuizQuestion();
+            } else {
+                toggleQuizBtn.textContent = '進入測驗模式';
+                toggleQuizBtn.classList.replace('bg-red-600', 'bg-blue-600');
+                statusBar.classList.add('hidden');
+                updateScaleDisplay();
+            }
+        };
+
+        resetBtn.onclick = () => {
+            if (isQuizMode) nextQuizQuestion();
+            else updateScaleDisplay();
+        };
+
+        rootSelect.onchange = updateScaleDisplay;
+        scaleSelect.onchange = updateScaleDisplay;
+        window.onload = initFretboard;
+        window.onresize = initFretboard;
+    </script>
+</body>
+</html>
