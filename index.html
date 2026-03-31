@@ -125,7 +125,6 @@
     <div class="max-w-6xl mx-auto px-4 py-8">
         <header class="text-center mb-8">
             <h1 class="text-3xl font-bold text-gray-800">吉他指板音階記憶學習網</h1>
-            <p class="text-gray-600 mt-2">根音顏色：#e68c8c | 指板漸層：#a38867 ↔ #6e5956</p>
         </header>
 
         <!-- 控制面板 -->
@@ -185,22 +184,6 @@
                 <div class="fretboard" id="fretboard">
                     <!-- 琴弦與品位由 JS 注入 -->
                 </div>
-            </div>
-        </div>
-
-        <!-- 說明 -->
-        <div class="grid grid-cols-1 md:grid-cols-2 gap-8 text-gray-600">
-            <div class="bg-white p-6 rounded-lg shadow border-t-4 border-gray-400">
-                <h3 class="font-bold text-gray-800 mb-2 flex items-center">
-                    <span class="mr-2">🎸</span> 視覺優化
-                </h3>
-                <p class="text-sm">指板採用垂直漸層模擬木頭質感。根音以淡紅色 (#e68c8c) 標記，其他音階組成音為青綠色。</p>
-            </div>
-            <div class="bg-white p-6 rounded-lg shadow border-t-4 border-blue-500">
-                <h3 class="font-bold text-gray-800 mb-2 flex items-center">
-                    <span class="mr-2">🎯</span> 練習重點
-                </h3>
-                <p class="text-sm">觀察 12 品與空弦（0 品）的音名分佈完全相同，這是指板記憶的最基本週期規律。</p>
             </div>
         </div>
     </div>
@@ -353,7 +336,7 @@
                     const circle = document.getElementById(`note-${i}-${j}`);
                     if (currentScaleNotes.includes(noteName)) {
                         circle.classList.add('visible');
-                        // 根音顏色改為 #e68c8c，非根音維持 #8ae3c8 (60%)
+                        // 根音顏色為 #e68c8c，非根音維持 #8ae3c8 (60%)
                         circle.style.backgroundColor = (noteName === root) ? '#e68c8c' : 'rgba(138, 227, 200, 0.6)';
                     } else {
                         circle.classList.remove('visible');
